@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mantis Shrimp 3D - Ocean Analytics Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/"
+        }
+    }
+    </script>
+    <style>
+        body { 
+            margin: 0; 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #001122 0%, #002244 50%, #003366 100%);
+            overflow-x: hidden;
+        }
+        #canvas-container { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100vw; 
+            height: 100vh; 
+            z-index: 1; 
+        }
+        .ui-panel {
+            position: fixed;
+            background: rgba(0, 20, 40, 0.9);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(64, 224, 208, 0.3);
+            color: white;
+            border-radius: 15px;
+            padding: 20px;
+            z-index: 10;
+        }
+        .ocean-controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 10;
+        }
+        .ocean-button {
+            background: linear-gradient(135deg, #40e0d0 0%, #20b2aa 100%);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(64, 224, 208, 0.3);
+        }
+        .ocean-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(64, 224, 208, 0.5);
+        }
+        .twitter-link {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #1da1f2 0%, #0d8bd9 100%);
+            color: white;
+            text-decoration: none;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-weight: 600;
+            z-index: 10;
+            transition: all 0.3s;
+        }
+        .twitter-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(29, 161, 242, 0.4);
+        }
+        #graphs-container {
+            position: relative;
+            margin: 100vh auto 80px auto;
+            max-width: 1200px;
+            padding: 0 20px;
+            z-index: 10;
+        }
+        .graph-card {
+            background: rgba(0, 20, 40, 0.8);
+            border: 1px solid rgba(64, 224, 208, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            backdrop-filter: blur(10px);
+        }
+        .graph-header {
+            color: #40e0d0;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .loading-spinner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #40e0d0;
+            font-size: 18px;
+            z-index: 100;
+            text-align: center;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .spinning { animation: spin 2s linear infinite; }
+        @keyframes glow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .glow { animation: glow 2s ease-in-out infinite; }
+        .mantis-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .mantis-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+        }
+        .token-list {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .token-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(64, 224, 208, 0.2);
+            font-size: 14px;
+        }
+        .token-row:last-child {
+            border-bottom: none;
+        }
+        .token-rank {
+            color: #40e0d0;
+            font-weight: 600;
+            min-width: 40px;
+        }
+        .token-symbol {
+            color: #ffffff;
+            font-weight: 500;
+            flex: 1;
+        }
+        .message-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 15px;
+            color: white;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+        .address-container {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .address-label {
+            color: #40e0d0;
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        .address-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 8px 0;
+        }
+        .address-text {
+            color: #ff4444;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            flex: 1;
+            word-break: break-all;
+        }
+        .copy-btn {
+            background: linear-gradient(135deg, #40e0d0 0%, #20b2aa 100%);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        .copy-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(64, 224, 208, 0.4);
+        }
+        .promo-text {
+            color: #40e0d0;
+            font-weight: 600;
+            margin-top: 15px;
+            text-align: center;
+            font-size: 15px;
+            animation: glow 2s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <a href="https://twitter.com/1mantisshrimp" target="_blank" class="twitter-link">
+        🦐 @1mantisshrimp
+    </a>
+
+    <div id="statsPanel" class="ui-panel top-4 left-4 w-72">
+        <div class="mantis-title">
+            <img src="https://ipfs.io/ipfs/bafybeied4gzlmqbc76szsecisnsu6cvvnrrrrmqfnxyon3fmilw7uaqflm" 
+                 alt="Mantis Shrimp" class="mantis-icon" style="height: 40px; width: auto; border-radius: 8px;" />
+            <h2 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent">
+                Mantis Shrimp
+            </h2>
+        </div>
+        <div class="grid grid-cols-2 gap-4 text-center mt-4">
+            <div>
+                <div class="text-xl font-semibold text-green-400">NOW AVAILABLE!</div>
+            </div>
+            <div>
+                <div class="text-xl font-semibold text-green-400">BUY! INVEST!</div>
+            </div>
+        </div>
+        <div class="mt-4 text-xs text-gray-500">
+            <div>Domain: 1mantisshrimp.online</div>
+            <div>Status: <span class="text-green-400">Live</span></div>
+        </div>
+    </div>
+
+    <div class="ocean-controls">
+        <button class="ocean-button" onclick="toggleCoinSpin()">🪙 Coin Spin</button>
+    </div>
+
+    <div id="loading" class="loading-spinner">
+        <div class="spinning">🌊</div>
+        <div>Loading underwater analytics...</div>
+    </div>
+
+    <div id="graphs-container">
+        <div class="graph-card">
+            <div class="graph-header">
+                <span>🏆 Top 10 Tokens</span>
+            </div>
+            <div class="token-list">
+                <div class="token-row"><div class="token-rank">#1</div><div class="token-symbol">Mantis Shrimp</div></div>
+                <div class="token-row"><div class="token-rank">#2</div><div class="token-symbol">Mantis Shrimp</div></div>
+                <div class="token-row"><div class="token-rank">#3</div><div class="token-symbol">Mantis Shrimp</div></div>
+                <div class="token-row"><div class="token-rank">#4</div><div class="token-symbol">Mantis Shrimp</div></div>
+                <div class="token-row"><div class="token-rank">#5</div><div class="token-symbol">Mantis Shrimp</div></div>
+                <div class="token-row"><div class="token-rank">#6</div><div class="token-symbol">Mantis Shrimp</div></div>
+                <div class="token-row"><div class="token-rank">#7</div><div class="token-symbol">Mantis Shrimp</div></div>
+                <div class="token-row"><div class="token-rank">#8</div><div class="token-symbol">Mantis Shrimp</div></div>
+                <div class="token-row"><div class="token-rank">#9</div><div class="token-symbol">Bitcoin</div></div>
+                <div class="token-row"><div class="token-rank">#10</div><div class="token-symbol">Ethereum</div></div>
+            </div>
+        </div>
+        
+        <div class="graph-card">
+            <div class="graph-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <img src="https://ipfs.io/ipfs/bafybeifap2mlhpruslokrnk6z2oxo36vp4qlhfol6erqc6xh6aoxsiwgpa" 
+                         alt="Mantis Shrimp" style="width: 32px; height: 32px; border-radius: 6px;" />
+                </div>
+            </div>
+            <div class="message-box">
+                <div style="margin-bottom: 20px;">
+                    <div style="color: #40e0d0; font-weight: 700; font-size: 15px; margin-bottom: 8px; border-bottom: 2px solid rgba(64, 224, 208, 0.3); padding-bottom: 5px;">🇺🇸 ENGLISH</div>
+                    <p style="margin: 0;">Let's get paid together. Check the Twitter, we don't do rug pulls. We want you to get rich. Check our Twitter when you see our coin to find live information. We want you to get money, so we can get money too. <strong style="color: #40e0d0;">@1mantisshrimp</strong> is the Twitter.</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <div style="color: #40e0d0; font-weight: 700; font-size: 15px; margin-bottom: 8px; border-bottom: 2px solid rgba(64, 224, 208, 0.3); padding-bottom: 5px;">🇨🇳 中文</div>
+                    <p style="margin: 0;">让我们一起赚钱。查看我们的推特，我们绝不会搞割韭菜。我们希望你变得富有。看到我们的币时，请关注我们的推特以获取最新实时信息。我们想让你赚钱，这样我们也能赚钱。推特账号：<strong style="color: #40e0d0;">@1mantisshrimp</strong>。</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <div style="color: #40e0d0; font-weight: 700; font-size: 15px; margin-bottom: 8px; border-bottom: 2px solid rgba(64, 224, 208, 0.3); padding-bottom: 5px;">🇪🇸 ESPAÑOL</div>
+                    <p style="margin: 0;">Hagamos dinero juntos. Revisa nuestro Twitter, no hacemos rug pulls. Queremos que te hagas rico. Cuando veas nuestra moneda, consulta nuestro Twitter para obtener información en vivo. Queremos que ganes dinero para que nosotros también ganemos. Twitter: <strong style="color: #40e0d0;">@1mantisshrimp</strong>.</p>
+                </div>
+                <div>
+                    <div style="color: #40e0d0; font-weight: 700; font-size: 15px; margin-bottom: 8px; border-bottom: 2px solid rgba(64, 224, 208, 0.3); padding-bottom: 5px;">🇫🇷 FRANÇAIS</div>
+                    <p style="margin: 0;">Gagnons de l'argent ensemble. Consultez notre Twitter, nous ne faisons pas de rug pulls. Nous voulons que vous deveniez riche. Quand vous verrez notre coin, suivez notre Twitter pour obtenir des infos en temps réel. Nous voulons que vous gagniez de l'argent, pour que nous puissions gagner de l'argent aussi. Le compte Twitter est <strong style="color: #40e0d0;">@1mantisshrimp</strong>.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="graph-card">
+            <div class="graph-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span>🔥 Mantis Shrimp Coins</span>
+                    <img src="https://ipfs.io/ipfs/bafybeied4gzlmqbc76szsecisnsu6cvvnrrrrmqfnxyon3fmilw7uaqflm" 
+                         alt="Mantis Shrimp" style="width: 28px; height: 28px; border-radius: 6px;" />
+                </div>
+            </div>
+            <div class="address-container">
+                <div class="address-label">🌟 SOLANA ADDRESSES</div>
+                <div class="address-item">
+                    <div class="address-text">CXUBs5hbuST6dGuyCnMLBwsnTz1s5ezkGrATgpo5o2eb</div>
+                    <button class="copy-btn" onclick="copyAddress('CXUBs5hbuST6dGuyCnMLBwsnTz1s5ezkGrATgpo5o2eb')">Copy</button>
+                </div>
+                <div class="address-item">
+                    <div class="address-text">68WLuTeDPuKAywunaNqegLPPhwhx21BQ7aqKweXzxg1V</div>
+                    <button class="copy-btn" onclick="copyAddress('68WLuTeDPuKAywunaNqegLPPhwhx21BQ7aqKweXzxg1V')">Copy</button>
+                </div>
+                <div class="address-item">
+                    <div class="address-text">7YZg5mZh74JThv3mHmpWD3oCBHL7khUtWGRQmeFm1scR</div>
+                    <button class="copy-btn" onclick="copyAddress('7YZg5mZh74JThv3mHmpWD3oCBHL7khUtWGRQmeFm1scR')">Copy</button>
+                </div>
+            </div>
+            <div class="address-container">
+                <div class="address-label">💎 ETHEREUM ADDRESS</div>
+                <div class="address-item">
+                    <div class="address-text">0xFdE62DE99385b5BE85e0B1587a561e52f93211d3</div>
+                    <button class="copy-btn" onclick="copyAddress('0xFdE62DE99385b5BE85e0B1587a561e52f93211d3')">Copy</button>
+                </div>
+            </div>
+            <div class="message-box" style="background: linear-gradient(135deg, rgba(64, 224, 208, 0.1) 0%, rgba(32, 178, 170, 0.1) 100%); border: 2px solid rgba(64, 224, 208, 0.3);">
+                <p style="text-align: center; font-size: 16px; color: #40e0d0; font-weight: 600; margin-bottom: 10px;">🚀 AND MANY MORE TOKENS COMING SOON! 🚀</p>
+                <p style="text-align: center; color: white;">More tokens launching regularly! Stay tuned for the next wave of Mantis Shrimp coins.</p>
+                <p style="text-align: center; color: white; margin-top: 10px;"><strong style="color: #40e0d0;">Check our Twitter</strong> for official addresses, live updates, and more information and details.</p>
+                <div class="promo-text" style="margin-top: 20px; font-size: 18px;">🦐 MANTIS SHRIMP - THE FUTURE OF CRYPTO 🦐</div>
+                <p style="text-align: center; color: #22c55e; margin-top: 15px; font-size: 15px; font-weight: 600;">Don't miss out on the ocean's most powerful punch! 🥊💥</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        let scene, camera, renderer, controls, oceanFloor, coral = [], rocks = [], sandPatches = [], spinningCoin, bubbles = [], coinSpinning = true;
+        const IPFS_COIN_IMAGE = 'https://ipfs.io/ipfs/bafybeiaesnpvri3fugrf5u2p5awmpouou77y6knujiddegggta3je5fkhy';
+
+        function initOceanScene() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x001133, 0.008);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 15, 45);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0x001122, 0.95);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2.2;
+            controls.minDistance = 10;
+            controls.maxDistance = 100;
+            const ambientLight = new THREE.AmbientLight(0x4080ff, 0.4);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0x40e0d0, 1.2);
+            directionalLight.position.set(20, 30, 20);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+            const underwaterLight = new THREE.PointLight(0x00ffff, 0.8, 50);
+            underwaterLight.position.set(0, 20, 0);
+            scene.add(underwaterLight);
+            createOceanFloor();
+            createCoral();
+            createRocks();
+            createSandPatches();
+            createSpinningCoin();
+            createBubbles();
+            animate();
+        }
+
+        function createOceanFloor() {
+            const floorGeometry = new THREE.PlaneGeometry(200, 200, 50, 50);
+            const floorMaterial = new THREE.MeshLambertMaterial({ color: 0x1a4d66, transparent: true, opacity: 0.9 });
+            const vertices = floorGeometry.attributes.position.array;
+            for (let i = 0; i < vertices.length; i += 3) {
+                vertices[i + 2] += Math.sin(vertices[i] * 0.1) * Math.cos(vertices[i + 1] * 0.1) * 0.5;
+            }
+            floorGeometry.attributes.position.needsUpdate = true;
+            floorGeometry.computeVertexNormals();
+            oceanFloor = new THREE.Mesh(floorGeometry, floorMaterial);
+            oceanFloor.rotation.x = -Math.PI / 2;
+            oceanFloor.position.y = -8;
+            oceanFloor.receiveShadow = true;
+            scene.add(oceanFloor);
+        }
+
+        function createCoral() {
+            for (let i = 0; i < 12; i++) {
+                const coralGroup = new THREE.Group();
+                const coralGeometry = new THREE.CylinderGeometry(0.5, 1.2, 6, 8);
+                const coralMaterial = new THREE.MeshLambertMaterial({ color: new THREE.Color().setHSL(0.02 + Math.random() * 0.08, 0.8, 0.6) });
+                const coralMesh = new THREE.Mesh(coralGeometry, coralMaterial);
+                coralMesh.position.y = 3;
+                coralMesh.castShadow = true;
+                coralGroup.add(coralMesh);
+                for (let j = 0; j < 4; j++) {
+                    const branchGeometry = new THREE.CylinderGeometry(0.2, 0.4, 3, 6);
+                    const branchMaterial = new THREE.MeshLambertMaterial({ color: new THREE.Color().setHSL(0.05 + Math.random() * 0.05, 0.7, 0.5) });
+                    const branch = new THREE.Mesh(branchGeometry, branchMaterial);
+                    branch.position.set((Math.random() - 0.5) * 3, 4 + Math.random() * 2, (Math.random() - 0.5) * 3);
+                    branch.rotation.z = (Math.random() - 0.5) * 0.5;
+                    branch.castShadow = true;
+                    coralGroup.add(branch);
+                }
+                coralGroup.position.set((Math.random() - 0.5) * 80, -8, (Math.random() - 0.5) * 80);
+                coral.push(coralGroup);
+                scene.add(coralGroup);
+            }
+        }
+
+        function createRocks() {
+            for (let i = 0; i < 25; i++) {
+                const rockGeometry = new THREE.DodecahedronGeometry(Math.random() * 2 + 0.5);
+                const rockMaterial = new THREE.MeshLambertMaterial({ color: 0x555566 });
+                const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+                rock.position.set((Math.random() - 0.5) * 120, -8 + Math.random() * 1.5, (Math.random() - 0.5) * 120);
+                rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+                rock.castShadow = true;
+                rock.receiveShadow = true;
+                rocks.push(rock);
+                scene.add(rock);
+            }
+        }
+
+        function createSandPatches() {
+            for (let i = 0; i < 15; i++) {
+                const sandGeometry = new THREE.CircleGeometry(Math.random() * 8 + 3, 12);
+                const sandMaterial = new THREE.MeshLambertMaterial({ color: 0xc2b280 });
+                const sandPatch = new THREE.Mesh(sandGeometry, sandMaterial);
+                sandPatch.rotation.x = -Math.PI / 2;
+                sandPatch.position.set((Math.random() - 0.5) * 100, -7.8, (Math.random() - 0.5) * 100);
+                sandPatch.receiveShadow = true;
+                sandPatches.push(sandPatch);
+                scene.add(sandPatch);
+            }
+        }
+
+        async function createSpinningCoin() {
+            try {
+                const coinGeometry = new THREE.CylinderGeometry(3, 3, 0.3, 32);
+                const textureLoader = new THREE.TextureLoader();
+                const coinTexture = await new Promise((resolve, reject) => {
+                    textureLoader.load(IPFS_COIN_IMAGE, resolve, undefined, reject);
+                });
+                const coinMaterial = new THREE.MeshPhongMaterial({ map: coinTexture, shininess: 80, transparent: false });
+                spinningCoin = new THREE.Mesh(coinGeometry, coinMaterial);
+                spinningCoin.position.set(0, 5, -10);
+                spinningCoin.castShadow = true;
+                const glowGeometry = new THREE.CylinderGeometry(3.2, 3.2, 0.4, 32);
+                const glowMaterial = new THREE.MeshBasicMaterial({ color: 0x40e0d0, transparent: true, opacity: 0.15 });
+                const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+                spinningCoin.add(glowMesh);
+                scene.add(spinningCoin);
+            } catch (error) {
+                console.error('Error loading coin texture:', error);
+                const coinGeometry = new THREE.CylinderGeometry(3, 3, 0.3, 32);
+                const coinMaterial = new THREE.MeshPhongMaterial({ color: 0xb8860b, shininess: 100 });
+                spinningCoin = new THREE.Mesh(coinGeometry, coinMaterial);
+                spinningCoin.position.set(0, 5, -10);
+                spinningCoin.castShadow = true;
+                scene.add(spinningCoin);
+            }
+        }
+
+        function createBubbles() {
+            for (let i = 0; i < 50; i++) {
+                const bubbleGeometry = new THREE.SphereGeometry(Math.random() * 0.3 + 0.1, 8, 8);
+                const bubbleMaterial = new THREE.MeshBasicMaterial({ color: 0xaaccff, transparent: true, opacity: 0.4 });
+                const bubble = new THREE.Mesh(bubbleGeometry, bubbleMaterial);
+                bubble.position.set((Math.random() - 0.5) * 150, Math.random() * 30 - 10, (Math.random() - 0.5) * 150);
+                bubble.velocity = Math.random() * 0.02 + 0.01;
+                bubbles.push(bubble);
+                scene.add(bubble);
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            if (spinningCoin && coinSpinning) {
+                spinningCoin.rotation.y += 0.02;
+                spinningCoin.position.y = 5 + Math.sin(Date.now() * 0.001) * 0.5;
+            }
+            bubbles.forEach(bubble => {
+                bubble.position.y += bubble.velocity;
+                if (bubble.position.y > 40) {
+                    bubble.position.y = -15;
+                    bubble.position.x = (Math.random() - 0.5) * 150;
+                    bubble.position.z = (Math.random() - 0.5) * 150;
+                }
+            });
+            camera.position.x += Math.sin(Date.now() * 0.0002) * 0.01;
+            renderer.render(scene, camera);
+        }
+
+        window.toggleCoinSpin = function() {
+            coinSpinning = !coinSpinning;
+        };
+
+        window.copyAddress = function(address) {
+            navigator.clipboard.writeText(address).then(() => {
+                alert('Address copied to clipboard! 🎉');
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy address. Please copy manually.');
+            });
+        };
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        initOceanScene();
+        setTimeout(() => {
+            document.getElementById('loading').style.display = 'none';
+        }, 2000);
+
+        console.log('🌊 Mantis Shrimp 3D Dashboard initialized');
+        console.log('🦐 Domain: 1mantisshrimp.online');
+        console.log('🦐 Twitter: @1mantisshrimp');
+    </script>
+</body>
+</html>
